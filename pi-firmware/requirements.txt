@@ -1,0 +1,6 @@
+flask==3.1.0
+flask-cors==5.0.1
+# Use rpi-lgpio on Pi 5 (RPi.GPIO fails with "Cannot determine SOC peripheral base address")
+# Do not install both RPi.GPIO and rpi-lgpio in the same venv
+rpi-lgpio>=0.4.0
+smbus2==0.5.0
