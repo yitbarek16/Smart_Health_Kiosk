@@ -12,7 +12,6 @@ const hospitalSchema = new mongoose.Schema({
   bookingFee: { type: Number, default: 0 },
   isActive: { type: Boolean, default: true },
   googlePlaceId: { type: String, default: null },
-  imageUrl: { type: String, default: null },
 }, { timestamps: true });
 
 hospitalSchema.index({ location: '2dsphere' });
