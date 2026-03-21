@@ -1,0 +1,136 @@
+import 'package:flutter/material.dart';
+import '../services/api_service.dart';
+import 'hospital_selection_screen.dart';
+
+class ResultsScreen extends StatefulWidget {
+  final Map<String, dynamic> vitals;
+  final String measurementId;
+  const ResultsScreen({super.key, required this.vitals, required this.measurementId});
+
+  @override
+  State<ResultsScreen> createState() => _ResultsScreenState();
+}
+
+class _ResultsScreenState extends State<ResultsScreen> {
+  bool _analyzing = false;
+  Map<String, dynamic>? _insight;
+  Map<String, dynamic>? _hospitals;
+  String? _error;
+
+  Future<void> _analyze() async {
+    setState(() { _analyzing = true; _error = null; });
+    try {
+      final res = await ApiService.analyzeAndSuggest(
+        measurementId: widget.measurementId,
+        latitude: 8.54,
+        longitude: 39.27,
+      );
+      setState(() {
+        _insight = res['insight'];
+        _hospitals = res['hospitals'];
+        _analyzing = false;
+      });
+    } catch (e) {
+      setState(() { _error = 'Analysis failed: $e'; _analyzing = false; });
+    }
+  }
+
+  @override
+  void initState() {
+    super.initState();
+    _analyze();
+  }
+
+  Color _riskColor(String? level) {
+    switch (level) {
+      case 'critical': return Colors.red;
+      case 'high': return Colors.orange;
+      case 'moderate': return Colors.amber.shade700;
+      default: return Colors.green;
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final v = widget.vitals;
+    return Scaffold(
+      appBar: AppBar(title: const Text('Results & AI Insights')),
+      body: ListView(
+        padding: const EdgeInsets.all(20),
+        children: [
+          Text('Vital Signs', style: Theme.of(context).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold)),
+          const SizedBox(height: 12),
+          _vitalRow('Blood Pressure', '${v['systolicBP'] ?? '-'}/${v['diastolicBP'] ?? '-'} mmHg'),
+          _vitalRow('Heart Rate', '${v['heartRate'] ?? '-'} bpm'),
+          _vitalRow('SpO2', '${v['spo2'] ?? '-'}%'),
+          _vitalRow('Temperature', '${v['temperatureCelsius'] ?? '-'}°C'),
+          _vitalRow('Weight', '${v['weightKg'] ?? '-'} kg'),
+          _vitalRow('Height', '${v['heightCm'] ?? '-'} cm'),
+          _vitalRow('BMI', '${v['bmi'] ?? '-'}'),
+          const SizedBox(height: 24),
+          if (_analyzing) const Center(child: Column(children: [CircularProgressIndicator(), SizedBox(height: 12), Text('Analyzing your vitals...')])),
+          if (_error != null) Card(color: Colors.red.shade50, child: Padding(padding: const EdgeInsets.all(16), child: Text(_error!, style: TextStyle(color: Colors.red.shade700)))),
+          if (_insight != null) ...[
+            Card(
+              child: Padding(
+                padding: const EdgeInsets.all(20),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        const Text('AI Health Insight', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+                        const Spacer(),
+                        Chip(label: Text(_insight!['riskLevel'] ?? 'low', style: TextStyle(color: _riskColor(_insight!['riskLevel']))), backgroundColor: _riskColor(_insight!['riskLevel']).withAlpha(25)),
+                      ],
+                    ),
+                    const SizedBox(height: 12),
+                    Text(_insight!['summaryText'] ?? ''),
+                    const SizedBox(height: 12),
+                    if (_insight!['preventiveAdvice'] != null) Text('Advice: ${_insight!['preventiveAdvice']}', style: const TextStyle(fontStyle: FontStyle.italic)),
+                    const SizedBox(height: 12),
+                    Container(
+                      padding: const EdgeInsets.all(10),
+                      decoration: BoxDecoration(color: Colors.amber.shade50, borderRadius: BorderRadius.circular(8)),
+                      child: const Text('This is NOT a clinical diagnosis. Please consult a healthcare professional.', style: TextStyle(fontSize: 12, color: Colors.brown)),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+            const SizedBox(height: 20),
+            if (_hospitals != null) FilledButton.icon(
+              onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => HospitalSelectionScreen(
+                hospitals: _hospitals!,
+                measurementId: widget.measurementId,
+                aiInsightId: _insight!['_id'],
+                conditionLabel: _insight!['conditionCategory'] ?? '',
+              ))),
+              icon: const Icon(Icons.local_hospital),
+              label: const Text('View Suggested Hospitals'),
+            ),
+            const SizedBox(height: 12),
+            OutlinedButton.icon(
+              onPressed: () => Navigator.pop(context),
+              icon: const Icon(Icons.refresh),
+              label: const Text('Re-measure'),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+
+  Widget _vitalRow(String label, String value) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 6),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          Text(label, style: const TextStyle(color: Colors.grey)),
+          Text(value, style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 16)),
+        ],
+      ),
+    );
+  }
+}

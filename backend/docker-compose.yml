@@ -1,0 +1,12 @@
+# Local MongoDB for development (no Atlas / no internet required)
+# Run: docker compose up -d
+# Then set in .env: MONGODB_URI=mongodb://localhost:27017/smart_health_kiosk
+services:
+  mongodb:
+    image: mongo:7
+    container_name: smart_health_kiosk_mongo
+    restart: unless-stopped
+    ports:
+      - "27017:27017"
+    environment:
+      MONGO_INITDB_DATABASE: smart_health_kiosk
