@@ -8,7 +8,11 @@ function PatientList() {
   ];
 
   return (
-    <div>
+    <div style={{
+      display: "flex",
+      gap: "15px",
+      flexWrap: "wrap"
+    }}>
       {patients.map((p, index) => (
         <PatientCard
           key={index}
