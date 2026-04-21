@@ -2,6 +2,14 @@ const { Measurement, AIInsight, Patient } = require('../models');
 const { analyzeVitals } = require('../services/llmService');
 const { findNearbyHospitals } = require('../services/mapsService');
 
+function normalizeVitals(vitals) {
+  if (!vitals || typeof vitals !== 'object') return vitals;
+  const out = { ...vitals };
+  // Treat weight 0 as no sensor (store null like other missing params)
+  if (out.weightKg === 0) out.weightKg = null;
+  return out;
+}
+
 exports.createMeasurement = async (req, res) => {
   try {
     const patientId = req.user.id;
@@ -10,7 +18,7 @@ exports.createMeasurement = async (req, res) => {
     const measurement = await Measurement.create({
       patientId,
       kioskId,
-      vitals,
+      vitals: normalizeVitals(vitals),
       measuredAt: measuredAt || new Date(),
       syncStatus: 'synced',
     });
@@ -45,10 +53,23 @@ exports.analyzeAndSuggest = async (req, res) => {
       riskLevel: llmResult.riskLevel,
       conditionCategory: llmResult.conditionCategory,
       preventiveAdvice: llmResult.preventiveAdvice,
+      isRuleBased: llmResult.isRuleBased === true,
     });
 
-    const lat = latitude || 0;
-    const lng = longitude || 0;
+    // Prefer explicit request coordinates; otherwise fall back to patient's saved location.
+    let lat = Number(latitude);
+    let lng = Number(longitude);
+    const requestCoordsValid = Number.isFinite(lat) && Number.isFinite(lng) && (lat !== 0 || lng !== 0);
+    if (!requestCoordsValid) {
+      const patient = await Patient.findById(patientId).select('location').lean();
+      const savedCoords = patient?.location?.coordinates;
+      if (Array.isArray(savedCoords) && savedCoords.length >= 2) {
+        lng = Number(savedCoords[0]);
+        lat = Number(savedCoords[1]);
+      }
+    }
+    if (!Number.isFinite(lat)) lat = 0;
+    if (!Number.isFinite(lng)) lng = 0;
     const hospitals = await findNearbyHospitals(lat, lng, llmResult.conditionCategory);
 
     res.json({ insight, hospitals });
