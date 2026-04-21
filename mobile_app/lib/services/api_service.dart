@@ -44,18 +44,23 @@ class ApiService {
 
   static Future<Map<String, dynamic>> analyzeAndSuggest({
     required String measurementId,
-    required double latitude,
-    required double longitude,
+    double? latitude,
+    double? longitude,
   }) async {
+    await AuthService.getToken(); // ensure token loaded so headers include Bearer
+    final payload = <String, dynamic>{
+      'measurementId': measurementId,
+    };
+    if (latitude != null) payload['latitude'] = latitude;
+    if (longitude != null) payload['longitude'] = longitude;
     final res = await http.post(
       Uri.parse('$_base/measurements/analyze'),
       headers: AuthService.headers,
-      body: jsonEncode({
-        'measurementId': measurementId,
-        'latitude': latitude,
-        'longitude': longitude,
-      }),
+      body: jsonEncode(payload),
     );
+    if (res.statusCode != 200) {
+      throw Exception('Analysis failed: ${res.statusCode} ${res.body}');
+    }
     return jsonDecode(res.body);
   }
 
